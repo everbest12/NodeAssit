@@ -19,7 +19,8 @@ import {
   Play,
   Shield,
   Monitor,
-  Check
+  Check,
+  Info
 } from 'lucide-react'
 
 interface Step {
@@ -29,6 +30,9 @@ interface Step {
   icon: React.ReactNode
   content: React.ReactNode
   completed: boolean
+  code?: string
+  codeTitle?: string
+  additionalInfo?: string
 }
 
 interface Toast {
@@ -38,7 +42,7 @@ interface Toast {
 }
 
 export default function SetupWizard() {
-  const [currentStep, setCurrentStep] = useState(0)
+  const [currentStep, setCurrentStep] = useState(1)
   const [completedSteps, setCompletedSteps] = useState<number[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -142,7 +146,10 @@ export default function SetupWizard() {
             </div>
           </div>
         </div>
-      )
+      ),
+      code: `curl -L https://foundry.paradigm.xyz | bash`,
+      codeTitle: "Install Foundry",
+      additionalInfo: "This command installs Foundry, a development environment for Ethereum smart contracts. It's required for building and testing your Drosera contracts."
     },
     {
       id: 2,
@@ -199,7 +206,11 @@ export default function SetupWizard() {
             </div>
           </div>
         </div>
-      )
+      ),
+      code: `git clone https://github.com/izmerGhub/Drosera-Hoodi-Guide-Setup--Izmer
+cd Drosera-Hoodi-Guide-Setup--Izmer`,
+      codeTitle: "Clone Repository",
+      additionalInfo: "This step involves cloning the Drosera-Hoodi-Guide-Setup repository from GitHub. This repository contains all the necessary configuration files and setup scripts."
     },
     {
       id: 3,
@@ -278,7 +289,26 @@ address = "YOUR_TRAP_CONFIG_ADDRESS"`)}
             </div>
           </div>
         </div>
-      )
+      ),
+      code: `ethereum_rpc = "https://ethereum-hoodi-rpc.publicnode.com"
+drosera_rpc = "https://relay.hoodi.drosera.io"
+eth_chain_id = 560048
+drosera_address = "0x91cB447BaFc6e0EA0F4Fe056F5a9b1F14bb06e5D"
+
+[traps]
+[traps.mytrap]
+path = "out/Trap.sol/Trap.json"
+response_contract = "0x25E2CeF36020A736CF8a4D2cAdD2EBE3940F4608"
+response_function = "respondWithDiscordName(string)"
+cooldown_period_blocks = 33
+min_number_of_operators = 1
+max_number_of_operators = 2
+block_sample_size = 10
+private_trap = true
+whitelist = ["YOUR_OPERATOR_ADDRESS"]
+address = "YOUR_TRAP_CONFIG_ADDRESS"`,
+      codeTitle: "Trap Configuration",
+      additionalInfo: "This step involves configuring the `drosera.toml` file with your network settings, trap address, and operator whitelist."
     },
     {
       id: 4,
@@ -361,7 +391,12 @@ address = "YOUR_TRAP_CONFIG_ADDRESS"`)}
             </div>
           </div>
         </div>
-      )
+      ),
+      code: `forge build
+drosera dryrun
+DROSERA_PRIVATE_KEY=your_private_key drosera apply`,
+      codeTitle: "Deploy Trap",
+      additionalInfo: "This step involves building the Drosera Trap contract, testing its configuration, and deploying it to the network."
     },
     {
       id: 5,
@@ -481,7 +516,35 @@ OP_KEY=your_operator_private_key`}
             </div>
           </div>
         </div>
-      )
+      ),
+      code: `version: '3.8'
+ services:
+   operator:
+     image: ghcr.io/drosera-network/drosera-operator:latest
+     network_mode: host
+     command: ["node"]
+     environment:
+       - DRO__ETH__CHAIN_ID=560048
+       - DRO__ETH__RPC_URL=https://rpc.hoodi.ethpandaops.io
+       - DRO__ETH__PRIVATE_KEY=\${OP_KEY}
+       - DRO__NETWORK__P2P_PORT=31313
+       - DRO__SERVER__PORT=31314
+       - DRO__NETWORK__EXTERNAL_P2P_ADDRESS=\${SERVER_IP}
+       - DRO__DISABLE_DNR_CONFIRMATION=true
+       - DRO__LOG__LEVEL=debug
+     volumes:
+       - operator_data:/data
+     restart: always
+
+ volumes:
+   operator_data:
+     nano .env
+     SERVER_IP=your.server.ip
+     OP_KEY=your_operator_private_key
+     docker compose up -d
+     docker logs operator --tail 50`,
+      codeTitle: "Setup Operator",
+      additionalInfo: "This step involves deploying and configuring the Drosera Operator. This operator is responsible for managing the P2P network and interacting with the Drosera network."
     },
     {
       id: 6,
@@ -579,7 +642,13 @@ OP_KEY=your_operator_private_key`}
             </div>
           </div>
         </div>
-      )
+      ),
+      code: `drosera-operator optin --eth-rpc-url https://ethereum-hoodi-rpc.publicnode.com --eth-private-key YOUR_WALLET_KEY --trap-config-address YOUR_TRAP_ADDRESS
+https://app.drosera.io/
+cast call 0x25E2CeF36020A736CF8a4D2cAdD2EBE3940F4608 "isResponder(address)(bool)" YOUR_ADDRESS --rpc-url https://ethereum-hoodi-rpc.publicnode.com
+cast call 0x25E2CeF36020A736CF8a4D2cAdD2EBE3940F4608 "getDiscordNamesBatch(uint256,uint256)(string[])" 0 2000 --rpc-url https://ethereum-hoodi-rpc.publicnode.com`,
+      codeTitle: "Register & Verify",
+      additionalInfo: "This step involves registering your operator on the Drosera network and verifying its functionality."
     }
   ]
 
@@ -590,14 +659,14 @@ OP_KEY=your_operator_private_key`}
   }
 
   const nextStep = () => {
-    if (currentStep < steps.length - 1) {
-      handleStepComplete(steps[currentStep].id)
+    if (currentStep < steps.length) {
+      handleStepComplete(currentStep)
       setCurrentStep(currentStep + 1)
     }
   }
 
   const prevStep = () => {
-    if (currentStep > 0) {
+    if (currentStep > 1) {
       setCurrentStep(currentStep - 1)
     }
   }
@@ -613,109 +682,174 @@ OP_KEY=your_operator_private_key`}
               initial={{ opacity: 0, x: 300, scale: 0.3 }}
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: 300, scale: 0.5 }}
-              className={`flex items-center space-x-2 px-4 py-3 rounded-lg shadow-lg ${
+              className={`flex items-center space-x-2 px-3 md:px-4 py-2 md:py-3 rounded-lg shadow-lg text-sm md:text-base ${
                 toast.type === 'success' 
                   ? 'bg-green-500 text-white' 
                   : 'bg-red-500 text-white'
               }`}
             >
-              <Check className="w-4 h-4" />
-              <span className="text-sm font-medium">{toast.message}</span>
+              <Check className="w-3 h-3 md:w-4 md:h-4" />
+              <span className="font-medium">{toast.message}</span>
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
 
-      <div className="web3-card p-6">
+      <div className="web3-card p-4 md:p-6">
         {/* Header */}
-        <div className="flex items-center space-x-3 mb-8">
-          <div className="w-12 h-12 bg-gradient-to-r from-web3-secondary to-web3-purple rounded-xl flex items-center justify-center">
-            <Wand2 className="w-6 h-6 text-white" />
+        <div className="text-center mb-6 md:mb-8">
+          <div className="flex items-center justify-center space-x-3 mb-3 md:mb-4">
+            <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-r from-web3-primary to-web3-secondary rounded-lg md:rounded-xl flex items-center justify-center">
+              <Wand2 className="w-4 h-4 md:w-6 md:h-6 text-white" />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-web3-primary to-web3-secondary bg-clip-text text-transparent">
+              Setup Wizard
+            </h1>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">Setup Wizard</h2>
-            <p className="text-gray-400">Step-by-step guide to deploy your node</p>
-          </div>
+          <p className="text-gray-400 text-sm md:text-base max-w-2xl mx-auto">
+            Follow this step-by-step guide to set up your node. Each step includes detailed instructions and code snippets.
+          </p>
         </div>
 
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            {steps.map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div className="flex flex-col items-center">
-                  <div 
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      index <= currentStep 
-                        ? 'bg-gradient-to-r from-web3-primary to-web3-secondary text-white' 
-                        : 'bg-web3-dark/50 text-gray-400'
-                    }`}
-                  >
-                    {completedSteps.includes(step.id) ? (
-                      <CheckCircle className="w-6 h-6" />
-                    ) : (
-                      step.icon
-                    )}
-                  </div>
-                  <div className="mt-2 text-center">
-                    <p className={`text-sm font-medium ${
-                      index <= currentStep ? 'text-white' : 'text-gray-400'
-                    }`}>
-                      {step.title}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
-                {index < steps.length - 1 && (
-                  <div className={`w-16 h-1 mx-4 ${
-                    index < currentStep ? 'bg-gradient-to-r from-web3-primary to-web3-secondary' : 'bg-web3-dark/50'
-                  }`} />
-                )}
-              </div>
-            ))}
+        {/* Progress Indicator */}
+        <div className="mb-6 md:mb-8">
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <span className="text-sm md:text-base text-gray-400">Progress</span>
+            <span className="text-sm md:text-base text-web3-primary font-medium">
+              {currentStep} of {steps.length}
+            </span>
+          </div>
+          <div className="w-full bg-web3-dark/50 rounded-full h-2 md:h-3">
+            <motion.div
+              className="bg-gradient-to-r from-web3-primary to-web3-secondary h-2 md:h-3 rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${(currentStep / steps.length) * 100}%` }}
+              transition={{ duration: 0.5 }}
+            />
           </div>
         </div>
 
         {/* Step Content */}
-        <div className="min-h-[600px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-            >
-              {steps[currentStep].content}
-            </motion.div>
-          </AnimatePresence>
+        <div className="mb-6 md:mb-8">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-4 md:space-y-6"
+          >
+            <div className="flex items-start space-x-3 md:space-x-4">
+              <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-r from-web3-primary to-web3-secondary rounded-lg md:rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-bold text-sm md:text-lg">{currentStep}</span>
+              </div>
+              <div className="flex-1">
+                <h2 className="text-lg md:text-xl font-semibold text-white mb-2 md:mb-3">
+                  {steps[currentStep - 1].title}
+                </h2>
+                <p className="text-gray-300 text-sm md:text-base leading-relaxed">
+                  {steps[currentStep - 1].description}
+                </p>
+              </div>
+            </div>
+
+            {/* Code Snippet */}
+            {steps[currentStep - 1].code && (
+              <div className="bg-web3-dark/50 border border-web3-primary/20 rounded-lg p-3 md:p-4">
+                <div className="flex items-center justify-between mb-2 md:mb-3">
+                  <span className="text-sm md:text-base text-gray-400 font-mono">
+                    {steps[currentStep - 1].codeTitle}
+                  </span>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => copyToClipboard(steps[currentStep - 1].code!)}
+                    className="flex items-center space-x-1 md:space-x-2 px-2 md:px-3 py-1 md:py-2 bg-web3-primary/20 hover:bg-web3-primary/30 text-web3-primary rounded-lg text-xs md:text-sm font-medium transition-colors"
+                  >
+                    <Copy className="w-3 h-3 md:w-4 md:h-4" />
+                    <span>Copy</span>
+                  </motion.button>
+                </div>
+                <pre className="text-xs md:text-sm text-gray-300 overflow-x-auto">
+                  <code>{steps[currentStep - 1].code}</code>
+                </pre>
+              </div>
+            )}
+
+            {/* Additional Info */}
+            {steps[currentStep - 1].additionalInfo && (
+              <div className="bg-web3-accent/10 border border-web3-accent/20 rounded-lg p-3 md:p-4">
+                <div className="flex items-start space-x-2 md:space-x-3">
+                  <Info className="w-4 h-4 md:w-5 md:h-5 text-web3-accent mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm md:text-base font-medium text-web3-accent mb-1 md:mb-2">
+                      Additional Information
+                    </h3>
+                    <p className="text-gray-300 text-sm md:text-base">
+                      {steps[currentStep - 1].additionalInfo}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </motion.div>
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-700">
-          <button
+        <div className="flex justify-between items-center">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             onClick={prevStep}
-            disabled={currentStep === 0}
-            className="flex items-center space-x-2 px-6 py-3 bg-web3-dark/50 border border-web3-primary/30 rounded-lg text-gray-300 hover:bg-web3-primary/20 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+            disabled={currentStep === 1}
+            className="flex items-center space-x-2 px-4 md:px-6 py-2 md:py-3 bg-transparent border border-web3-primary/50 text-web3-primary rounded-lg font-medium hover:border-web3-primary hover:bg-web3-primary/10 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft className="w-4 h-4 md:w-5 md:h-5" />
             <span>Previous</span>
-          </button>
+          </motion.button>
 
-          <div className="text-sm text-gray-400">
-            Step {currentStep + 1} of {steps.length}
+          <div className="flex items-center space-x-2 md:space-x-4">
+            {currentStep < steps.length ? (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={nextStep}
+                className="flex items-center space-x-2 px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-web3-primary to-web3-secondary text-white rounded-lg font-medium hover:shadow-lg hover:shadow-web3-primary/25 transition-all duration-300 text-sm md:text-base"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-4 h-4 md:w-5 md:h-5" />
+              </motion.button>
+            ) : (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => window.open('https://app.drosera.io/', '_blank')}
+                className="flex items-center space-x-2 px-4 md:px-6 py-2 md:py-3 bg-gradient-to-r from-web3-accent to-web3-purple text-white rounded-lg font-medium hover:shadow-lg hover:shadow-web3-accent/25 transition-all duration-300 text-sm md:text-base"
+              >
+                <ExternalLink className="w-4 h-4 md:w-5 md:h-5" />
+                <span>View Dashboard</span>
+              </motion.button>
+            )}
           </div>
+        </div>
 
-          <button
-            onClick={nextStep}
-            disabled={currentStep === steps.length - 1}
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-web3-primary to-web3-secondary text-white rounded-lg hover:from-web3-secondary hover:to-web3-purple disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-          >
-            <span>{currentStep === steps.length - 1 ? 'Finish' : 'Next'}</span>
-            <ChevronRight className="w-5 h-5" />
-          </button>
+        {/* Step Indicators */}
+        <div className="mt-6 md:mt-8">
+          <div className="flex justify-center space-x-2 md:space-x-3">
+            {steps.map((_, index) => (
+              <motion.button
+                key={index}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setCurrentStep(index + 1)}
+                className={`w-2 h-2 md:w-3 md:h-3 rounded-full transition-all duration-300 ${
+                  currentStep === index + 1
+                    ? 'bg-web3-primary scale-125'
+                    : 'bg-gray-600 hover:bg-gray-500'
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>
