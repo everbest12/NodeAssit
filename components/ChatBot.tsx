@@ -335,20 +335,20 @@ What would you like to know? 🤖`,
                     <div className="prose prose-invert max-w-none">
                       <ReactMarkdown
                         components={{
-                          code({ node, inline, className, children, ...props }) {
+                          code: ({ className, children, ...props }: any) => {
                             const match = /language-(\w+)/.exec(className || '')
-                            return !inline && match ? (
+                            const isInline = !match
+                            return !isInline ? (
                               <SyntaxHighlighter
                                 style={tomorrow}
                                 language={match[1]}
                                 PreTag="div"
                                 className="rounded-lg my-2"
-                                {...props}
                               >
                                 {String(children).replace(/\n$/, '')}
                               </SyntaxHighlighter>
                             ) : (
-                              <code className="bg-gray-800 px-1 py-0.5 rounded text-sm" {...props}>
+                              <code className="bg-gray-800 px-1 py-0.5 rounded text-sm">
                                 {children}
                               </code>
                             )
